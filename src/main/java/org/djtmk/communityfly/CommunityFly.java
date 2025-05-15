@@ -1,8 +1,11 @@
 package org.djtmk.communityfly;
 
 import com.earth2me.essentials.Essentials;
-import net.kyori.adventure.text.TextComponent;
+import net.kyori.adventure.text.Component;
 import net.milkbowl.vault.economy.Economy;
+import org.bukkit.Bukkit;
+import org.bukkit.Particle;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -13,8 +16,6 @@ import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.Particle;
 import org.djtmk.communityfly.api.FlightPlaceholders;
 import org.djtmk.communityfly.command.FlyCommand;
 import org.djtmk.communityfly.database.Database;
@@ -22,8 +23,8 @@ import org.djtmk.communityfly.database.MySQLDatabase;
 import org.djtmk.communityfly.database.SQLiteDatabase;
 
 import java.util.HashMap;
-import java.util.UUID;
 import java.util.List;
+import java.util.UUID;
 
 public class CommunityFly extends JavaPlugin implements Listener {
     private HashMap<UUID, Double> flightTimes;
@@ -36,14 +37,12 @@ public class CommunityFly extends JavaPlugin implements Listener {
 
     @Override
     public void onEnable() {
-        // Initialize configuration
         saveDefaultConfig();
         config = getConfig();
         flightTimes = new HashMap<>();
         lastMoved = new HashMap<>();
         flightDisabledTime = new HashMap<>();
 
-        // Initialize database
         String dbType = config.getString("database.type", "sqlite");
         if (dbType.equalsIgnoreCase("mysql")) {
             database = new MySQLDatabase(this);
@@ -52,30 +51,24 @@ public class CommunityFly extends JavaPlugin implements Listener {
         }
         database.initialize();
 
-        // Load flight times
         for (Player player : getServer().getOnlinePlayers()) {
             flightTimes.put(player.getUniqueId(), database.getFlightTime(player.getUniqueId()));
         }
 
-        // Setup economy
         if (!setupEconomy()) {
             getLogger().warning("Vault not found! Donation feature disabled.");
         }
 
-        // Check for Essentials
         essentials = (Essentials) getServer().getPluginManager().getPlugin("Essentials");
 
-        // Register events and commands
         getServer().getPluginManager().registerEvents(this, this);
         getCommand("cfly").setExecutor(new FlyCommand(this));
 
-        // Start flight management tasks
         startFlightConsumptionTask();
         startIdlePenaltyTask();
         startParticleTask();
         startFlightMeterTask();
 
-        // Register PlaceholderAPI
         if (getServer().getPluginManager().getPlugin("PlaceholderAPI") != null) {
             new FlightPlaceholders(this).register();
         }
@@ -131,7 +124,7 @@ public class CommunityFly extends JavaPlugin implements Listener {
                     }
                 }
             }
-        }.runTaskTimer(this, 0L, 20L); // Every second
+        }.runTaskTimer(this, 0L, 20L);
     }
 
     private void startIdlePenaltyTask() {
@@ -141,10 +134,8 @@ public class CommunityFly extends JavaPlugin implements Listener {
                 for (Player player : getServer().getOnlinePlayers()) {
                     long lastMove = lastMoved.getOrDefault(player.getUniqueId(), System.currentTimeMillis());
                     if (System.currentTimeMillis() - lastMove > config.getLong("inactivity.timeout", 300000)) {
-                        if (isPlayerFlying(player)) {
-                            if (config.getBoolean("idle.disable-flight", true)) {
-                                disableFlight(player, "§cFlight disabled due to inactivity!");
-                            }
+                        if (isPlayerFlying(player) && config.getBoolean("idle.disable-flight", true)) {
+                            disableFlight(player, "§cFlight disabled due to inactivity!");
                         }
                         double penalty = config.getDouble("inactivity.penalty", 1.0);
                         removeFlightTime(player, penalty);
@@ -171,17 +162,16 @@ public class CommunityFly extends JavaPlugin implements Listener {
                     }
                 }
             }
-        }.runTaskTimer(this, 0L, 5L); // Every 0.25 seconds
+        }.runTaskTimer(this, 0L, 5L);
     }
 
     private void startFlightMeterTask() {
         new BukkitRunnable() {
             @Override
             public void run() {
-                for (Player player : getServer().getOnlinePlayers()) {
+                for (Player player : Bukkit.getOnlinePlayers()) {
                     if (isPlayerFlying(player) && config.getBoolean("aesthetics.flight-meter.enabled", true)) {
-                        player.spigot().sendMessage(org.bukkit.ChatMessageType.ACTION_BAR,
-                                new TextComponent("§aFlight Time: §e" + String.format("%.1f", getFlightTime(player)) + "s"));
+                        player.sendActionBar(Component.text("§aFlight Time: §e" + String.format("%.1f", getFlightTime(player)) + "s"));
                     }
                 }
             }
@@ -189,20 +179,11 @@ public class CommunityFly extends JavaPlugin implements Listener {
     }
 
     private boolean isPlayerFlying(Player player) {
-        if (essentials != null) {
-            try {
-                if (essentials.getUser(player).isFlying()) {
-                    return false; // Respect Essentials Fly
-                }
-            } catch (Exception e) {
-                getLogger().warning("Error checking Essentials fly status: " + e.getMessage());
-            }
-        }
         return player.isFlying();
     }
 
     private void disableFlight(Player player, String message) {
-        if (isPlayerFlying(player)) {
+        if (player.isFlying()) {
             player.setFlying(false);
             player.setAllowFlight(false);
             flightDisabledTime.put(player.getUniqueId(), System.currentTimeMillis());
@@ -253,10 +234,6 @@ public class CommunityFly extends JavaPlugin implements Listener {
         }
     }
 
-    public FileConfiguration getConfig() {
-        return config;
-    }
-
     public double getFlightTime(Player player) {
         return flightTimes.getOrDefault(player.getUniqueId(), 0.0);
     }
@@ -283,7 +260,7 @@ public class CommunityFly extends JavaPlugin implements Listener {
     }
 
     public void addFlightTimeToAll(double time) {
-        for (Player player : getServer().getOnlinePlayers()) {
+        for (Player player : Bukkit.getOnlinePlayers()) {
             addFlightTime(player, time);
             player.sendMessage("§aCommunity donation granted +" + time + " seconds of flight time to everyone!");
         }
