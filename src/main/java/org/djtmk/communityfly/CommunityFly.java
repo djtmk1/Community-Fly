@@ -3,9 +3,6 @@ package org.djtmk.communityfly;
 import com.earth2me.essentials.Essentials;
 import net.kyori.adventure.text.Component;
 import net.milkbowl.vault.economy.Economy;
-import org.bukkit.Bukkit;
-import org.bukkit.Particle;
-import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -16,15 +13,18 @@ import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.Particle;
 import org.djtmk.communityfly.api.FlightPlaceholders;
 import org.djtmk.communityfly.command.FlyCommand;
 import org.djtmk.communityfly.database.Database;
 import org.djtmk.communityfly.database.MySQLDatabase;
 import org.djtmk.communityfly.database.SQLiteDatabase;
+import org.djtmk.communityfly.gui.DonationGUI;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.UUID;
+import java.util.List;
 
 public class CommunityFly extends JavaPlugin implements Listener {
     private HashMap<UUID, Double> flightTimes;
@@ -34,6 +34,7 @@ public class CommunityFly extends JavaPlugin implements Listener {
     private Database database;
     private Economy economy;
     private Essentials essentials;
+    private DonationGUI donationGUI;
 
     @Override
     public void onEnable() {
@@ -60,6 +61,7 @@ public class CommunityFly extends JavaPlugin implements Listener {
         }
 
         essentials = (Essentials) getServer().getPluginManager().getPlugin("Essentials");
+        donationGUI = new DonationGUI(this);
 
         getServer().getPluginManager().registerEvents(this, this);
         getCommand("cfly").setExecutor(new FlyCommand(this));
@@ -90,7 +92,7 @@ public class CommunityFly extends JavaPlugin implements Listener {
             return false;
         }
         economy = rsp.getProvider();
-        return true;
+        return economy != null;
     }
 
     private void startFlightConsumptionTask() {
@@ -134,8 +136,10 @@ public class CommunityFly extends JavaPlugin implements Listener {
                 for (Player player : getServer().getOnlinePlayers()) {
                     long lastMove = lastMoved.getOrDefault(player.getUniqueId(), System.currentTimeMillis());
                     if (System.currentTimeMillis() - lastMove > config.getLong("inactivity.timeout", 300000)) {
-                        if (isPlayerFlying(player) && config.getBoolean("idle.disable-flight", true)) {
-                            disableFlight(player, "§cFlight disabled due to inactivity!");
+                        if (isPlayerFlying(player)) {
+                            if (config.getBoolean("idle.disable-flight", true)) {
+                                disableFlight(player, "§cFlight disabled due to inactivity!");
+                            }
                         }
                         double penalty = config.getDouble("inactivity.penalty", 1.0);
                         removeFlightTime(player, penalty);
@@ -169,7 +173,7 @@ public class CommunityFly extends JavaPlugin implements Listener {
         new BukkitRunnable() {
             @Override
             public void run() {
-                for (Player player : Bukkit.getOnlinePlayers()) {
+                for (Player player : getServer().getOnlinePlayers()) {
                     if (isPlayerFlying(player) && config.getBoolean("aesthetics.flight-meter.enabled", true)) {
                         player.sendActionBar(Component.text("§aFlight Time: §e" + String.format("%.1f", getFlightTime(player)) + "s"));
                     }
@@ -179,10 +183,31 @@ public class CommunityFly extends JavaPlugin implements Listener {
     }
 
     private boolean isPlayerFlying(Player player) {
+        if (essentials != null) {
+            try {
+                Object user = essentials.getClass().getMethod("getUser", Player.class).invoke(essentials, player);
+                if (user != null && (Boolean) user.getClass().getMethod("isFlying").invoke(user)) {
+                    return false; // Don't manage Essentials flight
+                }
+            } catch (Exception e) {
+                getLogger().warning("Error checking Essentials fly status: " + e.getMessage());
+            }
+        }
         return player.isFlying();
     }
 
     private void disableFlight(Player player, String message) {
+        if (essentials != null) {
+            try {
+                Object user = essentials.getClass().getMethod("getUser", Player.class).invoke(essentials, player);
+                if (user != null && (Boolean) user.getClass().getMethod("isFlying").invoke(user)) {
+                    return; // Don't disable if Essentials is managing flight
+                }
+            } catch (Exception e) {
+                getLogger().warning("Error during Essentials flight check in disableFlight: " + e.getMessage());
+            }
+        }
+
         if (player.isFlying()) {
             player.setFlying(false);
             player.setAllowFlight(false);
@@ -234,6 +259,10 @@ public class CommunityFly extends JavaPlugin implements Listener {
         }
     }
 
+    public FileConfiguration getConfig() {
+        return config;
+    }
+
     public double getFlightTime(Player player) {
         return flightTimes.getOrDefault(player.getUniqueId(), 0.0);
     }
@@ -260,7 +289,7 @@ public class CommunityFly extends JavaPlugin implements Listener {
     }
 
     public void addFlightTimeToAll(double time) {
-        for (Player player : Bukkit.getOnlinePlayers()) {
+        for (Player player : getServer().getOnlinePlayers()) {
             addFlightTime(player, time);
             player.sendMessage("§aCommunity donation granted +" + time + " seconds of flight time to everyone!");
         }
@@ -272,5 +301,9 @@ public class CommunityFly extends JavaPlugin implements Listener {
 
     public Database getDatabase() {
         return database;
+    }
+
+    public DonationGUI getDonationGUI() {
+        return donationGUI;
     }
 }

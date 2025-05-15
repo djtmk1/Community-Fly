@@ -17,6 +17,14 @@
             <id>placeholderapi</id>
             <url>https://repo.extendedclip.com/repository/maven-public/</url>
         </repository>
+        <repository>
+            <id>essentials</id>
+            <url>https://repo.essentialsx.net/releases/</url>
+        </repository>
+        <repository>
+            <id>codemc-repo</id>
+            <url>https://repo.codemc.org/repository/maven-public</url>
+        </repository>
     </repositories>
 
     <dependencies>
@@ -43,9 +51,9 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>net.milkbowl</groupId>
-            <artifactId>vault-api</artifactId>
-            <version>1.7.3</version>
+            <groupId>net.milkbowl.vault</groupId>
+            <artifactId>VaultUnlockedAPI</artifactId>
+            <version>2.10</version>
             <scope>provided</scope>
         </dependency>
         <dependency>

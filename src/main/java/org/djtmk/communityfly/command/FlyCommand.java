@@ -5,7 +5,6 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.djtmk.communityfly.CommunityFly;
-import org.djtmk.communityfly.gui.DonationGUI;
 
 public class FlyCommand implements CommandExecutor {
     private final CommunityFly plugin;
@@ -17,8 +16,8 @@ public class FlyCommand implements CommandExecutor {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length < 1) {
-            if (sender instanceof Player && sender.hasPermission("communityfly.donate")) {
-                new DonationGUI(plugin, (Player) sender).open();
+            if (sender instanceof Player player && player.hasPermission("communityfly.donate")) {
+                plugin.getDonationGUI().openGUI(player);
                 return true;
             }
             sender.sendMessage("§cUsage: /cfly [give|take|set|check|reload|trade]");
@@ -105,8 +104,7 @@ public class FlyCommand implements CommandExecutor {
                     sender.sendMessage("§cNo permission!");
                     return true;
                 }
-                if (args.length == 3 && sender instanceof Player) {
-                    Player senderPlayer = (Player) sender;
+                if (args.length == 3 && sender instanceof Player senderPlayer) {
                     Player target = plugin.getServer().getPlayer(args[1]);
                     if (target != null) {
                         try {

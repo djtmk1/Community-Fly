@@ -1,6 +1,7 @@
 package org.djtmk.communityfly.gui;
 
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -12,60 +13,76 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.djtmk.communityfly.CommunityFly;
 
 import java.util.Arrays;
+import java.util.List;
 
 public class DonationGUI implements Listener {
+
     private final CommunityFly plugin;
-    private final Player player;
-    private final Inventory inventory;
 
-    public DonationGUI(CommunityFly plugin, Player player) {
+    public DonationGUI(CommunityFly plugin) {
         this.plugin = plugin;
-        this.player = player;
-        this.inventory = Bukkit.createInventory(null, 9, "Community Flight Donation");
-        initializeItems();
-        plugin.getServer().getPluginManager().registerEvents(this, plugin);
+        Bukkit.getPluginManager().registerEvents(this, plugin);
     }
 
-    private void initializeItems() {
-        for (int i = 0; i < 3; i++) {
-            String path = "donation.tier" + (i + 1);
-            double cost = plugin.getConfig().getDouble(path + ".cost", 100.0 * (i + 1));
-            double time = plugin.getConfig().getDouble(path + ".time", 60.0 * (i + 1));
-            ItemStack item = new ItemStack(Material.EMERALD);
-            ItemMeta meta = item.getItemMeta();
-            meta.setDisplayName("§aDonate $" + cost);
-            meta.setLore(Arrays.asList("§7Grants " + time + "s flight time", "§7to all online players"));
+    public void openGUI(Player player) {
+        Inventory inv = Bukkit.createInventory(null, 9, ChatColor.GREEN + "Donate for Flight Time");
+
+        inv.addItem(createItem(Material.FEATHER, "30 seconds - $500", "500", "30"));
+        inv.addItem(createItem(Material.FEATHER, "1 minute - $800", "800", "60"));
+        inv.addItem(createItem(Material.FEATHER, "5 minutes - $2000", "2000", "300"));
+
+        player.openInventory(inv);
+    }
+
+    private ItemStack createItem(Material material, String displayName, String cost, String time) {
+        ItemStack item = new ItemStack(material);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(ChatColor.YELLOW + displayName);
+            meta.setLore(Arrays.asList(
+                    ChatColor.GRAY + "Cost: $" + cost,
+                    ChatColor.GRAY + "Time: " + time + " seconds"
+            ));
             item.setItemMeta(meta);
-            inventory.setItem(i * 2, item);
         }
-    }
-
-    public void open() {
-        player.openInventory(inventory);
+        return item;
     }
 
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
-        if (event.getInventory() != inventory) return;
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+
+        if (!event.getView().getTitle().equals(ChatColor.GREEN + "Donate for Flight Time")) return;
+
         event.setCancelled(true);
+        ItemStack clicked = event.getCurrentItem();
 
-        if (!(event.getWhoClicked() instanceof Player)) return;
-        Player p = (Player) event.getWhoClicked();
-        int slot = event.getRawSlot();
-        if (slot >= 0 && slot < 9 && inventory.getItem(slot) != null) {
-            int tier = (slot / 2) + 1;
-            String path = "donation.tier" + tier;
-            double cost = plugin.getConfig().getDouble(path + ".cost", 100.0 * tier);
-            double time = plugin.getConfig().getDouble(path + ".time", 60.0 * tier);
+        if (clicked == null || !clicked.hasItemMeta() || clicked.getItemMeta() == null) return;
 
-            if (plugin.getEconomy() != null && plugin.getEconomy().has(p, cost)) {
-                plugin.getEconomy().withdrawPlayer(p, cost);
+        ItemMeta meta = clicked.getItemMeta();
+        List<String> lore = meta.getLore();
+        if (lore == null || lore.size() < 2) return;
+
+        String costLine = ChatColor.stripColor(lore.get(0)).replace("Cost: $", "");
+        String timeLine = ChatColor.stripColor(lore.get(1)).replace("Time: ", "").replace(" seconds", "");
+
+        try {
+            double cost = Double.parseDouble(costLine);
+            int time = Integer.parseInt(timeLine);
+
+            if (plugin.getEconomy() != null &&
+                    plugin.getEconomy().has(player, cost)) {
+                plugin.getEconomy().withdrawPlayer(player, cost);
                 plugin.addFlightTimeToAll(time);
-                p.sendMessage("§aThank you for donating! Everyone received " + time + " seconds of flight time!");
+                player.sendMessage(ChatColor.GREEN + "Thanks! Everyone received " + time + " seconds of flight time.");
             } else {
-                p.sendMessage("§cYou don't have enough money!");
+                player.sendMessage(ChatColor.RED + "You don't have enough money or an economy account.");
             }
-            p.closeInventory();
+        } catch (NumberFormatException e) {
+            player.sendMessage(ChatColor.RED + "An error occurred processing your donation.");
+            plugin.getLogger().warning("Failed to parse cost/time from GUI item: " + e.getMessage());
         }
+
+        player.closeInventory();
     }
 }
