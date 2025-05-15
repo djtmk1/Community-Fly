@@ -1,0 +1,19 @@
+name: CommunityFly
+version: 1.0
+main: org.djtmk.communityfly.CommunityFly
+api-version: 1.20
+author: djtmk
+depend: [PlaceholderAPI, Vault]
+softdepend: [WorldGuard, PlotSquared, Residence, Lands, GriefPrevention]
+
+commands:
+  cfly:
+    description: Manage Community Fly plugin
+    usage: /<command> [give|take|set|check|reload]
+permissions:
+  communityfly.admin:
+    description: Allows access to all Community Fly admin commands
+    default: op
+  communityfly.fly:
+    description: Allows players to fly using flight time
+    default: true

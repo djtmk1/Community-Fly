@@ -1,0 +1,47 @@
+# CommunityFly Configuration
+database:
+  type: sqlite # Options: sqlite, mysql
+  mysql:
+    host: localhost
+    port: 3306
+    database: communityfly
+    user: root
+    password: ""
+
+bonuses:
+  daily: 300.0 # Seconds awarded daily
+  first-join: 600.0 # Seconds for first join
+
+restrictions:
+  disabled-worlds: [] # List of worlds where flight is disabled
+  max-height: 256.0 # Maximum flight height
+
+inactivity:
+  timeout: 300000 # Milliseconds before considered inactive
+  penalty: 1.0 # Seconds deducted per second of inactivity
+  disable-flight: true # Disable flight when inactive
+
+flight:
+  speed:
+    default: 0.1 # Default flight speed
+    vip: 0.2 # Speed for communityfly.speed.vip permission
+
+aesthetics:
+  particles:
+    enabled: true
+    type: CLOUD # Particle type (e.g., CLOUD, FLAME)
+  flight-meter:
+    enabled: true
+  low-time-warning:
+    threshold: 30.0 # Warn when time falls below this
+
+donation:
+  tier1:
+    cost: 100000.0 # Cost in economy currency
+    time: 60.0 # Seconds granted to all players
+  tier2:
+    cost: 200.0
+    time: 120.0
+  tier3:
+    cost: 300.0
+    time: 180.0
